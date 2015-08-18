@@ -327,7 +327,7 @@ def print_summary(reference, mobile, mapping, rmsd_info):
             chain_rms, n_res, markers = rmsd_info[r_id]
             _vals = (r_id, mc_id, seq_id, gap_id, chain_rms, n_res, c_len)
             print('[++] {0}<>{1} := {2:5.1f}% | {3:5.1f}% | {4:5.2f}A ({5}/{6})'.format(*_vals))
-            # print('\t{0[2]}\n\t{0[0]}\n\t{0[1]}\n\t{1}'.format(aln, markers))
+            print('\t{0[2]}\n\t{0[0]}\n\t{0[1]}\n\t{1}'.format(aln, markers))
         else:
             print('[++] {0}<>None := No Match'.format(r_id))
 
