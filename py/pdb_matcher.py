@@ -67,8 +67,7 @@ def parse_structure(struct):
     s = parser.get_structure(sname, full_path)
     # Ensemble check
     if len(s) > 1:
-        print('[!!] Ensembles are not supported: {0}'.format(struct), file=sys.stderr)
-        print('[!!] Using first model only')
+        print('[!!] {0} is an ensemble. Reading first model only. '.format(struct), file=sys.stderr)
 
         class ModelSelector(Select):
             def accept_model(self, model):
@@ -83,7 +82,7 @@ def parse_structure(struct):
 
         s = parser.get_structure(sname, tempf)
         tempf.close()
-        
+
     # Double occupancy check
     for atom in list(s.get_atoms()):
         if atom.is_disordered():
@@ -263,6 +262,7 @@ def match_structures(reference, mobile, mapping):
     # Remove leftover chains
     for chain in list(mobile.get_chains()):
         if chain.id.endswith('_tag'):
+            print('[++] Removing chain: {0}'.format(chain.id[:-4]))
             mobile[0].detach_child(chain.id)
 
     # Superimposer (iterative, discards atoms)
