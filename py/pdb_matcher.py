@@ -32,13 +32,14 @@ from __future__ import print_function, division
 from operator import itemgetter
 import os
 import sys
+import tempfile
 import warnings
 
 try:
     from Bio import BiopythonExperimentalWarning
     warnings.filterwarnings('ignore', category=BiopythonExperimentalWarning)
 
-    from Bio.PDB import PDBParser, PDBIO, Superimposer
+    from Bio.PDB import PDBParser, PDBIO, Select, Superimposer
     from Bio import pairwise2
     from Bio.SubsMat import MatrixInfo as matlist
     from Bio.Data.SCOPData import protein_letters_3to1 as aa3to1
@@ -66,9 +67,23 @@ def parse_structure(struct):
     s = parser.get_structure(sname, full_path)
     # Ensemble check
     if len(s) > 1:
-        print('[!!] Ensembles are not supported'.format(struct), file=sys.stderr)
-        sys.exit(1)
+        print('[!!] Ensembles are not supported: {0}'.format(struct), file=sys.stderr)
+        print('[!!] Using first model only')
 
+        class ModelSelector(Select):
+            def accept_model(self, model):
+                if model.id == 1:
+                    return 1
+                else:
+                    return 0
+
+        tempf = tempfile.NamedTemporaryFile()
+        io.set_structure(s)
+        io.save(tempf.name, ModelSelector())
+
+        s = parser.get_structure(sname, tempf)
+        tempf.close()
+        
     # Double occupancy check
     for atom in list(s.get_atoms()):
         if atom.is_disordered():
