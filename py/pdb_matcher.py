@@ -3,8 +3,7 @@
 """
 Utility to match (and compare) PDB files.
 
-WILL NOT WORK PROPERLY ON HOMO-MULTIMERS BECAUSE OF THE CHAIN
-MATCHING LOOP.
+WILL NOT WORK PROPERLY ON HOMO-MULTIMERS.
 
 Uses global sequence alignment to find equivalent positions
 between the sequences. Also superimposes the structures based
@@ -20,9 +19,9 @@ Outputs several values, see the example:
          |     |        |         |------- Chain RMSD (n. atoms used in RMS/total in chain)
 [++] A<>A :=  95.4% |  99.0% |  1.70A
 	      + --------------------------------------------------------- Sequence mismatch
-	MSVPTDGAVTTSQIPASEQETLVRPKPLLLKLLKSVGAQKDTYTMKEVLFYLGQYIMTKRL --- Reference Sequence (trimmed)
-	MSVPTDEAVTTSQIPASEQETLVRPKPLLLKLLKSVGAQKDTYTMKEVLFYLGQYIMTKRL --- Mobile Sequence (trimmed)
-	***************   *   ------------------------------------------- Removed during RMS calculation
+	MSVPTDGAVTTSQIPASEQETLVRPKPLLLKLLKSVGAQKDTYTMKEVLFYLGQYIMTKRL --- Common Reference Sequence
+	MSVPTDEAVTTSQIPASEQETLVRPKPLLLKLLKSVGAQKDTYTMKEVLFYLGQYIMTKRL --- Common Mobile Sequence
+	***************   *   ------------------------------------------- Structure mismatch (RMSD outliers)
 
 Written by {0} [{1}]
 """
@@ -162,9 +161,11 @@ def _align_sequences(structA, structB, **kwargs):
     for aln_i, (aa_aln_A, aa_aln_B) in enumerate(zip(aligned_A, aligned_B)):
         if aa_aln_A == '-':
             if aa_aln_B != '-':
+                mapping[resseq_B[aa_i_B][0]] = None
                 aa_i_B += 1
         elif aa_aln_B == '-':
             if aa_aln_A != '-':
+                mapping[resseq_A[aa_i_A][0]] = None
                 aa_i_A += 1
         else:
             assert resseq_A[aa_i_A][1] == aa_aln_A
@@ -190,13 +191,15 @@ def _align_sequences(structA, structB, **kwargs):
     trail = min(trail_A, trail_B)
     trim_aln_A = aligned_A[lead:trail]
     trim_aln_B = aligned_B[lead:trail]
+
     mismatch = ''.join(['+' if a!=b else ' ' for (a,b) in zip(trim_aln_A, trim_aln_B)])
+    full_mismatch = ''.join(['+' if a!=b and (a!='-' and b!='-') else ' ' for (a,b) in zip(aligned_A, aligned_B)])
 
     # Calculate (gapless) sequence identity
     seq_id, g_seq_id = _calculate_identity(aligned_A, aligned_B)
-    return ((trim_aln_A, trim_aln_B, mismatch), seq_id, g_seq_id, mapping)
+    return ((aligned_A, aligned_B, full_mismatch), (trim_aln_A, trim_aln_B, mismatch), seq_id, g_seq_id, mapping)
 
-def match_chains(reference, mobile, min_id=30.0):
+def match_chains(reference, mobile, min_id=30.0, write_full_alignment=False):
     """
     Matches the chains of two different structures using
     pairwise sequence alignment. Minimum sequence id is 30%
@@ -214,7 +217,8 @@ def match_chains(reference, mobile, min_id=30.0):
             if mc.id in _mapped:
                 continue
 
-            aln, seq_id, gap_id, res_map = _align_sequences(rc, mc)
+            full_aln, aln, seq_id, gap_id, res_map = _align_sequences(rc, mc)
+            aln = full_aln if write_full_alignment else aln
             if seq_id >= best_id and gap_id >= 90.0:
                 _mapped.add(mc.id)
                 chain_map[rc.id] = (mc.id, seq_id, gap_id, aln, res_map)
@@ -222,15 +226,9 @@ def match_chains(reference, mobile, min_id=30.0):
                 if seq_id == 100.0:
                     break
 
-        # if rc.id not in chain_map:
-        #     print('[+++] {0} = No Match'.format(rc.id))
-        # else:
-        #     mc_id, seq_id, gap_id, _, _ = chain_map[rc.id]
-        #     print('[+++] {0}<>{1} = {2:5.1f} | {3:5.1f}'.format(rc.id, mc_id, seq_id, gap_id))
-
     return chain_map
 
-def match_structures(reference, mobile, mapping):
+def match_structures(reference, mobile, mapping, max_cycles=3):
     """
     Outputs fitted structures of 'trimmed' mobile structures,
     renumbered to match the reference.
@@ -249,7 +247,6 @@ def match_structures(reference, mobile, mapping):
     for rc_id in mapping:
         mc_id, _, _, _, c_map = mapping[rc_id]
         mc = mobile[0]['{0}_tag'.format(mc_id)]
-
         inv_c_map = dict([(v, k) for k, v in c_map.items()])
         mc_res_list = list(mc.get_residues())
         for res in mc_res_list:
@@ -276,13 +273,13 @@ def match_structures(reference, mobile, mapping):
         outliers = [True if d > av else False for d in dist]
         return outliers
 
-    n_trials = 0
-    r_atoms = [r['CA'] for r in reference.get_residues() if r.parent.id in mapping and r.id[1] in mapping[r.parent.id][4]]
+    n_cycles = 0
+    r_atoms = [r['CA'] for r in reference.get_residues() if mapping.get(r.parent.id) and mapping[r.parent.id][4].get(r.id[1])]
     m_atoms = [r['CA'] for r in mobile.get_residues()]
     ori_n_atoms = len(r_atoms)
 
     while 1:
-        n_trials += 1
+        n_cycles += 1
 
         super_imposer.set_atoms(r_atoms, m_atoms)
         super_imposer.apply(mobile.get_atoms())
@@ -293,7 +290,7 @@ def match_structures(reference, mobile, mapping):
         # print(n_trials, super_imposer.rms, n_outliers, n_atoms)
 
         # Stop if less than 90% of starting atoms or less than 5 outliers OR after 3 trials
-        if n_atoms < ori_n_atoms*0.9 or n_outliers < 5 or n_trials == 3:
+        if n_atoms < ori_n_atoms*0.9 or n_outliers < 5 or n_cycles == max_cycles:
             break
 
         # Remove outliers for better RMS
@@ -302,7 +299,7 @@ def match_structures(reference, mobile, mapping):
 
     # Build full list of outliers
     _r_atoms = set(r_atoms)
-    r_atoms = [r['CA'] for r in reference.get_residues() if r.parent.id in mapping and r.id[1] in mapping[r.parent.id][4]]
+    r_atoms = [r['CA'] for r in reference.get_residues() if mapping.get(r.parent.id) and mapping[r.parent.id][4].get(r.id[1])]
     m_atoms = [r['CA'] for r in mobile.get_residues()]
     outliers = [r not in _r_atoms for r in r_atoms]
 
@@ -341,6 +338,12 @@ def print_summary(reference, mobile, mapping, rmsd_info):
             c_len = len(res_map)
             chain_rms, n_res, markers = rmsd_info[r_id]
             _vals = (r_id, mc_id, seq_id, gap_id, chain_rms, n_res, c_len)
+
+            # ugly hack: pad markers to account for gaps
+            for aln_i, (aa_A, aa_B, _) in enumerate(zip(*aln)):
+                if aa_A == '-' or aa_B == '-':
+                    markers = markers[:aln_i] + ' ' + markers[aln_i:]
+
             print('[++] {0}<>{1} := {2:5.1f}% | {3:5.1f}% | {4:5.2f}A ({5}/{6})'.format(*_vals))
             print('\t{0[2]}\n\t{0[0]}\n\t{0[1]}\n\t{1}'.format(aln, markers))
         else:
@@ -362,7 +365,11 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser(description=__doc__.format(__author__, __email__), formatter_class=RawTextHelpFormatter)
 
     ap.add_argument('pdbf_list', type=str, nargs='+', help='PDB files')
-    ap.add_argument('--reference', type=str, help='Reference PDB file for comparison')
+    ap.add_argument('-r', '--reference', type=str, help='Reference PDB file for comparison')
+    ap.add_argument('--write_pdb', default=False, action='store_true', help='Write matched PDB files for each mobile structure')
+    ap.add_argument('--write_full_alignment', default=False, action='store_true', help='Write full alignment for each comparison')
+    ap.add_argument('--max_cycles', default=30.0, type=float, help='Minimum sequence identity to consider a match')
+    ap.add_argument('--min_identity', default=3, type=int, help='Maximum no. of cycles for RMSD calculation')
     cmd = ap.parse_args()
 
     # Bio.PDB classes
@@ -380,7 +387,8 @@ if __name__ == '__main__':
     for pdbf in cmd.pdbf_list:
         mobile = parse_structure(pdbf)
         print('[+] Comparing structures: {0} vs {1}'.format(reference.id, mobile.id))
-        chain_mapping = match_chains(reference, mobile)
-        rmsd_info = match_structures(reference, mobile, chain_mapping)
+        chain_mapping = match_chains(reference, mobile, cmd.min_identity, cmd.write_full_alignment)
+        rmsd_info = match_structures(reference, mobile, chain_mapping, cmd.max_cycles)
         print_summary(reference, mobile, chain_mapping, rmsd_info)
-        save_mobile(reference, mobile)
+        if cmd.write_pdb:
+            save_mobile(reference, mobile)
