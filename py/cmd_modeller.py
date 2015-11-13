@@ -99,7 +99,7 @@ else:
 
 ### Run Modelling
 ## Setup MODELLER environment
-j = job(modeller_path="/opt/software/modeller9.15/bin/modslave.py")
+j = job()
 j.append(local_slave())
 if not cmd.serial and cmd.num_jobs:
     for req_job in range(cmd.num_jobs - 1):
