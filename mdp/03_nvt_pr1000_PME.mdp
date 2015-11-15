@@ -32,7 +32,7 @@ DispCorr        = no
 tcoupl                   = v-rescale            ; Couple temperature to external heat bath according to Berendsen method
 tc-grps                  = Protein  Non-Protein ; Use separate heat baths for Protein and Non-Protein groups
 tau_t                    = 0.1      0.1         ; Coupling time constant, controlling strength of coupling
-ref_t                    = 310      310         ; Temperature of heat bath
+ref_t                    = XXX      XXX         ; Temperature of heat bath
 
 ; Pressure coupling is off
 pcoupl			= no	 		; no pressure coupling in NVT
@@ -40,7 +40,7 @@ pcoupl			= no	 		; no pressure coupling in NVT
 ; GENERATE VELOCITIES FOR STARTUP RUN
 gen_vel                  = yes    ; Assign velocities to particles by taking them randomly from a Maxwell distribution
 gen_temp                 = 310    ; Temperature to generate corresponding Maxwell distribution
-gen_seed                 = 917    ; Seed for (semi) random number generation. Different numbers give different sets of velocities
+gen_seed                 = XXX    ; Seed for (semi) random number generation. Different numbers give different sets of velocities
 
 ; OPTIONS FOR BONDS    
 constraints              = all-bonds	; All bonds will be treated as constraints (fixed length)

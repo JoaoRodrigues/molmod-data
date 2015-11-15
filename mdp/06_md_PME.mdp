@@ -2,7 +2,7 @@
 integrator               = md
 tinit                    = 0       ; Starting time
 dt                       = 0.002   ; 2 femtosecond time step for integration
-nsteps                   = 25000000     ; Make it 50 ns
+nsteps                   = XXXXX   ; Make it 50 ns
 
 ; OUTPUT CONTROL OPTIONS
 nstxout                  = 250000 ; Writing full precision coordinates every 0.5 ns
