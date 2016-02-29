@@ -185,7 +185,7 @@ if __name__ == '__main__':
                                 available colormaps refer to \
                                 matplotlib.org/examples/color/colormaps_reference.html')
 
-    ot_group.add_argument('-b', '--background-color', default='lightgray',
+    ot_group.add_argument('-b', '--background-color', default='white',
                           help='Background color used in the plot. For a list of all available \
                                 colors refer to \
                                 matplotlib.org/examples/color/named_colors.html')
