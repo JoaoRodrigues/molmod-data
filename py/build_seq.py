@@ -194,6 +194,6 @@ def build_seq(name, seq,ss=None,phi=None,psi=None):
   cmd.delete('pk1')
   cmd.delete('pkmol')
   cmd.set_name(seq3[0].lower(), name)
-
+  cmd.alter(name, 'resi=str(int(resi)-1)')
 
 cmd.extend('build_seq',build_seq)
